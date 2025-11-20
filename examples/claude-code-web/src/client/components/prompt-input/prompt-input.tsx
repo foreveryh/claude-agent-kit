@@ -16,6 +16,7 @@ import {
   replaceRangeWithValue,
   removeRange,
 } from "@/lib/mention-utils";
+import type { TextRangeMatch } from "@/lib/mention-utils";
 import {
   PermissionMode,
   ClaudeModelOption,
@@ -307,6 +308,100 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       window.setTimeout(reportInputFromDom, 100);
     };
 
+    const insertPlainTextAtCursor = (
+      text: string,
+      ensureLeadingSpace: boolean,
+    ) => {
+      if (!editableRef.current) {
+        return;
+      }
+
+      const selection = window.getSelection();
+      const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      const content = editableRef.current.textContent ?? "";
+
+      if (range && selection) {
+        const start = range.startOffset;
+        const end = range.endOffset;
+        const before = content.slice(0, start);
+        const after = content.slice(end);
+        const needsSpace =
+          ensureLeadingSpace && before.length > 0 && !before.endsWith(" ")
+            ? " "
+            : "";
+        const updatedText = `${before}${needsSpace}${text}${after}`;
+        editableRef.current.textContent = updatedText;
+        setInputValue(updatedText);
+
+        const node = editableRef.current.firstChild ?? editableRef.current;
+        if (node) {
+          const caret = document.createRange();
+          const offset = before.length + needsSpace.length + text.length;
+          caret.setStart(node, Math.min(offset, updatedText.length));
+          caret.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(caret);
+        }
+      } else {
+        const needsSpace =
+          ensureLeadingSpace && content.length > 0 && !content.endsWith(" ")
+            ? " "
+            : "";
+        const updatedText = `${content}${needsSpace}${text}`;
+        editableRef.current.textContent = updatedText;
+        setInputValue(updatedText);
+
+        const rangeNode = editableRef.current.firstChild ?? editableRef.current;
+        if (rangeNode) {
+          const caret = document.createRange();
+          caret.selectNodeContents(rangeNode);
+          caret.collapse(false);
+          const selectionInstance = window.getSelection();
+          selectionInstance?.removeAllRanges();
+          selectionInstance?.addRange(caret);
+        }
+      }
+
+      window.setTimeout(reportInputFromDom, 100);
+    };
+
+    const insertSlashCommandLabel = (
+      label: string,
+      range?: TextRangeMatch,
+    ) => {
+      if (!editableRef.current) {
+        return;
+      }
+
+      if (range) {
+        const afterFragment = inputValue.substring(range.end);
+        const appendedSpace = afterFragment.startsWith(" ") ? 0 : 1;
+        const updatedText = replaceRangeWithValue(
+          inputValue,
+          range,
+          label,
+          false,
+        );
+        editableRef.current.textContent = updatedText;
+        setInputValue(updatedText);
+
+        const node = editableRef.current.firstChild ?? editableRef.current;
+        if (node) {
+          const caret = document.createRange();
+          const offset =
+            range.start + label.length + (appendedSpace ? 1 : 0);
+          caret.setStart(node, Math.min(offset, updatedText.length));
+          caret.collapse(true);
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(caret);
+        }
+        return;
+      }
+
+      insertPlainTextAtCursor(`${label} `, false);
+    };
+
     const reportInputFromDom = () => {
       const value = editableRef.current?.textContent ?? "";
       setInputValue(value);
@@ -478,7 +573,7 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
 
     const handleCommandSelect = (
       command: { id: string; label: string },
-      triggeredByTab: boolean,
+      _triggeredByTab: boolean,
     ) => {
       setCommandMenuOpen(false);
       setSuppressCommandFilter(false);
@@ -490,53 +585,31 @@ export const PromptInput = forwardRef<PromptInputHandle, PromptInputProps>(
       context.safeFocus(editableRef.current);
 
       const isSlashShortcut = command.label.startsWith("/");
+
+      if (isSlashShortcut) {
+        insertSlashCommandLabel(command.label, slashCommand);
+        return;
+      }
+
       if (!slashCommand) {
         context.commandRegistry.executeCommand(command.id);
         return;
       }
 
-      if (triggeredByTab && isSlashShortcut) {
-        const updatedText = replaceRangeWithValue(
-          inputValue,
-          slashCommand,
-          `${command.label} `,
-          false,
-        );
-        editableRef.current.textContent = updatedText;
-        setInputValue(updatedText);
-
-        const node =
-          editableRef.current.firstChild ?? editableRef.current;
-        if (node) {
-          const range = document.createRange();
-          range.setStart(
-            node,
-            Math.min(
-              slashCommand.start + command.label.length + 1,
-              updatedText.length,
-            ),
-          );
-          range.collapse(true);
-          const selection = window.getSelection();
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-        }
-      } else {
-        const updatedText = removeRange(inputValue, slashCommand);
-        editableRef.current.textContent = updatedText;
-        setInputValue(updatedText);
-        const node =
-          editableRef.current.firstChild ?? editableRef.current;
-        if (node && updatedText.length > 0) {
-          const range = document.createRange();
-          range.setStart(node, slashCommand.start);
-          range.collapse(true);
-          const selection = window.getSelection();
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-        }
-        context.commandRegistry.executeCommand(command.id);
+      const updatedText = removeRange(inputValue, slashCommand);
+      editableRef.current.textContent = updatedText;
+      setInputValue(updatedText);
+      const node =
+        editableRef.current.firstChild ?? editableRef.current;
+      if (node && updatedText.length > 0) {
+        const range = document.createRange();
+        range.setStart(node, slashCommand.start);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
       }
+      context.commandRegistry.executeCommand(command.id);
     };
 
     const startAudioVisualization = () => {

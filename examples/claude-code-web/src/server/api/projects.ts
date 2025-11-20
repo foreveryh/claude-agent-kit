@@ -69,25 +69,13 @@ export async function collectProjects(): Promise<ProjectInfo[]> {
       continue
     }
 
-    const firstLine = await readFirstJsonLine(latestFilePath)
-    if (!firstLine) {
+    const metadata = await extractSessionMetadata(latestFilePath)
+    if (!metadata) {
       continue
     }
 
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(firstLine)
-    } catch {
-      continue
-    }
-
-    const cwd = (parsed as { cwd?: unknown } | undefined)?.cwd
-    if (typeof cwd !== 'string' || cwd.trim().length === 0) {
-      continue
-    }
-
-    const name = path.basename(cwd)
-    projects.push({ id: entry.name, name, path: cwd })
+    const name = path.basename(metadata.cwd)
+    projects.push({ id: entry.name, name, path: metadata.cwd })
   }
 
   return projects
@@ -102,7 +90,9 @@ export function getProjectsRoot(): string | null {
   return path.join(homeDir, '.claude', 'projects')
 }
 
-async function readFirstJsonLine(filePath: string): Promise<string | null> {
+async function extractSessionMetadata(
+  filePath: string,
+): Promise<{ cwd: string } | null> {
   let fileContent: string
 
   try {
@@ -115,13 +105,25 @@ async function readFirstJsonLine(filePath: string): Promise<string | null> {
     return null
   }
 
-  const newlineIndex = fileContent.indexOf('\n')
-  const firstLine = newlineIndex === -1 ? fileContent : fileContent.slice(0, newlineIndex)
+  const lines = fileContent.split(/\r?\n/)
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.length === 0) {
+      continue
+    }
 
-  const trimmed = firstLine.trim()
-  if (trimmed.length === 0) {
-    return null
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(trimmed.replace(/^\uFEFF/, ''))
+    } catch {
+      continue
+    }
+
+    const cwd = (parsed as { cwd?: unknown } | undefined)?.cwd
+    if (typeof cwd === 'string' && cwd.trim().length > 0) {
+      return { cwd: cwd.trim() }
+    }
   }
 
-  return trimmed.replace(/^\uFEFF/, '')
+  return null
 }

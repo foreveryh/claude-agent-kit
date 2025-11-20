@@ -47,6 +47,7 @@ const DEFAULT_SESSION_OPTIONS: SessionSDKOptions = {
   mcpServers: {},
   hooks: {},
   thinkingLevel: "default_on",
+  settingSources: ["user", "project", "local"],
 };
 
 function normalizeWorkspacePath(value?: string | null): string | undefined {

@@ -18,7 +18,7 @@
     "prepare": "pnpm run build"
   },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.22",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.47",
     "@types/node": "^24.8.1",
     "@types/ws": "^8.18.1",
     "typescript": "^5.4.5",

@@ -3,6 +3,7 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { resolveClaudeHomeDir } from "./claude-home";
 
 export const SESSION_FILE_EXTENSION = ".jsonl";
 
@@ -13,10 +14,7 @@ export interface LocateSessionFileParams {
 }
 
 export function getProjectsRoot(): string | null {
-  const bunHome = (globalThis as { Bun?: { env?: Record<string, string | undefined> } }).Bun?.env?.HOME;
-  const processHome = typeof process !== "undefined" ? process.env?.HOME ?? process.env?.USERPROFILE : undefined;
-  const homeDir = bunHome ?? processHome;
-
+  const homeDir = resolveClaudeHomeDir();
   if (!homeDir) {
     return null;
   }

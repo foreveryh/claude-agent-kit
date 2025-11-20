@@ -1,7 +1,14 @@
 import type { Express } from 'express'
 
+import type {
+  IClaudeAgentSDKClient,
+  SessionSDKOptions,
+} from '@claude-agent-kit/server'
+
 import { collectProjects } from './projects'
 import { collectSessionSummaries, readSessionDetails } from './project-sessions'
+import { formatErrorMessage } from './errors'
+import { collectCapabilitySummary } from './capabilities'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +16,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
-export function registerApiRoutes(app: Express) {
+type RegisterApiRoutesOptions = {
+  sdkClient?: IClaudeAgentSDKClient
+  defaultSessionOptions?: SessionSDKOptions
+  workspaceDir?: string
+}
+
+export function registerApiRoutes(
+  app: Express,
+  options: RegisterApiRoutesOptions = {},
+) {
+  const { sdkClient, defaultSessionOptions, workspaceDir } = options
+
   app.use('/api', (req, res, next) => {
     res.set(corsHeaders)
 
@@ -71,16 +89,26 @@ export function registerApiRoutes(app: Express) {
         .json({ error: 'Failed to read session details', details: formatErrorMessage(error) })
     }
   })
-}
 
-function formatErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
+  app.get('/api/capabilities', async (_req, res) => {
+    if (!sdkClient) {
+      res.status(503).json({ error: 'Capability inspection is not available' })
+      return
+    }
 
-  if (typeof error === 'string') {
-    return error
-  }
+    try {
+      const capabilities = await collectCapabilitySummary(
+        sdkClient,
+        defaultSessionOptions,
+        workspaceDir,
+      )
 
-  return 'Unknown error'
+      res.json({ capabilities })
+    } catch (error) {
+      res.status(500).json({
+        error: 'Failed to inspect Claude Agent SDK capabilities',
+        details: formatErrorMessage(error),
+      })
+    }
+  })
 }

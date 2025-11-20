@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
-import { useSetAtom } from 'jotai'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAtomValue, useSetAtom } from 'jotai'
 
 import { ChatHeader } from '@/components/chat/chat-header'
 import {
@@ -17,20 +17,24 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import { useWebSocket } from '@/hooks/use-web-socket'
+import { useCapabilities } from '@/hooks/use-capabilities'
 import type {
   ClaudeConfig,
   ClaudeModelOption,
   UsageData,
   UserMessage,
 } from '@/types/session'
+import type { ChangeEvent } from 'react'
 
 import type { AttachmentPayload } from '@claude-agent-kit/messages'
 import type { OutcomingMessage } from '@claude-agent-kit/server'
 import { createSystemMessage } from '@/lib/chat-message-utils'
 import {
   chatMessagesAtom,
+  chatProjectIdAtom,
   chatSessionInfoAtom,
 } from '@/state/chat-atoms'
+import { buildSessionPath, navigateTo } from '@/lib/route'
 import {
   useChatSessionState,
   useOutcomingMessageHandler,
@@ -122,6 +126,7 @@ function App() {
   const { messages, sessionId, sessionInfo } = useChatSessionState()
   const setMessages = useSetAtom(chatMessagesAtom)
   const setSessionInfo = useSetAtom(chatSessionInfoAtom)
+  const currentProjectId = useAtomValue(chatProjectIdAtom)
   const { isBusy, isLoading, options } = sessionInfo
   const permissionMode = options.permissionMode ?? 'default'
   const thinkingLevel = options.thinkingLevel ?? 'off'
@@ -135,6 +140,95 @@ function App() {
   const [commandEntries, setCommandEntries] = useState<Map<string, CommandEntry>>(
     () => new Map(),
   )
+  const skillFileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingSkill, setIsUploadingSkill] = useState(false)
+  const [skillUploadMessage, setSkillUploadMessage] = useState<string | null>(null)
+  const {
+    capabilities,
+    isLoading: isLoadingCapabilities,
+    error: capabilitiesError,
+    refresh: refreshCapabilities,
+  } = useCapabilities()
+
+  const handleNewSession = useCallback(
+    (projectId: string) => {
+      selectChatSession({ sessionId: null, projectId })
+    },
+    [selectChatSession],
+  )
+
+  useEffect(() => {
+    const slashList = (capabilities?.slashCommands ?? [])
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+
+    if (slashList.length === 0) {
+      setCommandEntries((previous) => {
+        const next = new Map(previous)
+        let changed = false
+        for (const key of next.keys()) {
+          if (key.startsWith('slash:')) {
+            next.delete(key)
+            changed = true
+          }
+        }
+        return changed ? next : previous
+      })
+      return
+    }
+
+    const slashSet = new Set(slashList)
+
+    setCommandEntries((previous) => {
+      let changed = false
+      const next = new Map(previous)
+
+      for (const key of [...next.keys()]) {
+        if (key.startsWith('slash:')) {
+          const commandName = key.slice('slash:'.length)
+          if (!slashSet.has(commandName)) {
+            next.delete(key)
+            changed = true
+          }
+        }
+      }
+
+      slashList.forEach((command) => {
+        const id = `slash:${command}`
+        if (!next.has(id)) {
+          next.set(id, {
+            action: {
+              id,
+              label: `/${command}`,
+              description: 'Slash command',
+            },
+            section: 'Slash Commands',
+            handler: () => {},
+          })
+          changed = true
+        }
+      })
+
+      return changed ? next : previous
+    })
+  }, [capabilities?.slashCommands, setCommandEntries])
+
+  useEffect(() => {
+    if (!currentProjectId || !sessionId) {
+      return
+    }
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const targetPath = buildSessionPath(currentProjectId, sessionId)
+    if (window.location.pathname === targetPath) {
+      return
+    }
+
+    navigateTo(targetPath)
+  }, [currentProjectId, sessionId])
 
   const usageData = useMemo<UsageData>(
     () => ({
@@ -194,6 +288,48 @@ function App() {
   }, [])
 
   const handleToggleIncludeSelection = useCallback(() => {}, [])
+
+  const handleSkillUploadClick = useCallback(() => {
+    skillFileInputRef.current?.click()
+  }, [])
+
+  const handleSkillFileSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) {
+        return
+      }
+      setIsUploadingSkill(true)
+      setSkillUploadMessage('Uploading skill…')
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const normalizedName = file.name.replace(/\.zip$/i, '')
+        if (normalizedName) {
+          formData.append('name', normalizedName)
+        }
+
+        const response = await fetch('/api/skills/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          const message = (payload as { error?: string })?.error ?? 'Failed to upload skill'
+          throw new Error(message)
+        }
+        setSkillUploadMessage('Skill uploaded successfully. Ready for next run.')
+        void refreshCapabilities()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to upload skill'
+        setSkillUploadMessage(message)
+      } finally {
+        setIsUploadingSkill(false)
+        event.target.value = ''
+      }
+    },
+    [refreshCapabilities],
+  )
 
   const handleAddFiles = useCallback((files: FileList) => {
     setAttachedFiles((previous) => [
@@ -373,6 +509,17 @@ function App() {
         sessionId={sessionId}
         isConnected={isConnected}
         connectionMessage={connectionMessage}
+        onUploadSkillClick={handleSkillUploadClick}
+        isUploadingSkill={isUploadingSkill}
+        skillUploadMessage={skillUploadMessage}
+      />
+
+      <input
+        ref={skillFileInputRef}
+        type="file"
+        accept=".zip,.skill"
+        className="hidden"
+        onChange={handleSkillFileSelected}
       />
 
       <main className="flex-1 overflow-hidden px-4 py-4">
@@ -389,6 +536,11 @@ function App() {
             <LeftSidebar
               selectedSessionId={sessionId}
               onSessionSelect={handleSessionSelect}
+              onNewSession={handleNewSession}
+              capabilities={capabilities}
+              isLoadingCapabilities={isLoadingCapabilities}
+              capabilitiesError={capabilitiesError}
+              onRefreshCapabilities={refreshCapabilities}
             />
           </ResizablePanel>
           <ResizableHandle />

@@ -1,0 +1,19 @@
+services:
+  claude-code-web:
+    build:
+      context: ../..
+      dockerfile: examples/claude-code-web/Dockerfile
+    ports:
+      - "${PORT:-5173}:5173"
+    env_file:
+      - .env
+    environment:
+      - PORT=${PORT:-5173}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - type: bind
+        source: ./agent
+        target: /app/agent

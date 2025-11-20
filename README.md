@@ -7,7 +7,7 @@ Utilities, patterns, and examples built around `@anthropic-ai/claude-agent-sdk`.
 - **WebSocket orchestration** for multi-client real-time experiences.
 - **Examples and UI groundwork** to accelerate new agent surfaces.
 
-> ℹ️ The package currently targets `@anthropic-ai/claude-agent-sdk@^0.1.0`. Adjust the version in `package.json` to match the SDK release you are using.
+> ℹ️ The package currently targets `@anthropic-ai/claude-agent-sdk@^0.1.47`. Adjust the version in `package.json` to match the SDK release you are using.
 
 ## Getting Started
 

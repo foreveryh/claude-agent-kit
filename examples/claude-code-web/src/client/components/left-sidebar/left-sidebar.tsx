@@ -14,6 +14,7 @@ import { ProjectPicker } from './project-picker'
 import { SessionList } from './session-list'
 import { SidebarHeader } from './sidebar-header'
 import { computeLatestActivity, isAbortError } from './utils'
+import { CapabilitiesPanel } from './capabilities-panel'
 
 const PROJECTS_ENDPOINT = '/api/projects'
 
@@ -21,6 +22,10 @@ export function LeftSidebar({
   onSessionSelect,
   onProjectChange,
   onNewSession,
+  capabilities,
+  isLoadingCapabilities,
+  capabilitiesError,
+  onRefreshCapabilities,
 }: LeftSidebarProps) {
   const { projectId: routeProjectId, sessionId: routeSessionId } = useRoute()
 
@@ -36,6 +41,7 @@ export function LeftSidebar({
   const [isLoadingSessions, setIsLoadingSessions] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
+  const [isNewSessionPending, setIsNewSessionPending] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -314,6 +320,10 @@ export function LeftSidebar({
       return
     }
 
+    if (isNewSessionPending && !routeSessionId) {
+      return
+    }
+
     const nextPath = buildSessionPath(selectedProjectId, derivedSessionId)
 
     if (!routeSessionId) {
@@ -337,13 +347,33 @@ export function LeftSidebar({
     routeSessionId,
     derivedSessionId,
     onSessionSelect,
+    isNewSessionPending,
   ])
+
+  useEffect(() => {
+    if (routeSessionId) {
+      setIsNewSessionPending(false)
+    }
+  }, [routeSessionId])
+
+  useEffect(() => {
+    setIsNewSessionPending(false)
+  }, [selectedProjectId])
 
   const handleProjectSelect = useCallback((projectId: string) => {
     setSelectedProjectId(projectId)
     setIsProjectPickerOpen(false)
     navigateTo(buildProjectPath(projectId))
   }, [])
+
+  const handleNewSessionClick = useCallback(() => {
+    if (!selectedProjectId) {
+      return
+    }
+    setIsNewSessionPending(true)
+    navigateTo(buildProjectPath(selectedProjectId))
+    onNewSession?.(selectedProjectId)
+  }, [onNewSession, selectedProjectId])
 
   const handleSessionClick = useCallback(
     (sessionId: string) => {
@@ -362,20 +392,30 @@ export function LeftSidebar({
   return (
     <div className="flex h-full min-h-0 flex-col border-r bg-sidebar">
       <SidebarHeader
-        onNewSession={onNewSession}
+        onNewSession={handleNewSessionClick}
         disabled={!selectedProjectId}
         projectName={currentProject ? currentProject.name : null}
         latestActivity={currentProject ? currentProject.latestActivity : null}
       />
       <div className="flex-1 overflow-hidden">
-        <ScrollArea className="flex h-full flex-col px-2 py-3">
-          <SessionList
-            sessions={currentSessions}
-            selectedSessionId={effectiveSessionId}
-            onSelect={handleSessionClick}
-            isLoading={isLoadingSessions}
-            errorMessage={errorMessage}
-          />
+        <ScrollArea className="h-full">
+          <div className="flex h-full flex-col gap-3 px-2 py-3">
+            <SessionList
+              sessions={currentSessions}
+              selectedSessionId={effectiveSessionId}
+              onSelect={handleSessionClick}
+              isLoading={isLoadingSessions}
+              errorMessage={errorMessage}
+            />
+            <div className="mt-auto">
+              <CapabilitiesPanel
+                capabilities={capabilities}
+                isLoading={isLoadingCapabilities}
+                errorMessage={capabilitiesError}
+                onRefresh={onRefreshCapabilities}
+              />
+            </div>
+          </div>
         </ScrollArea>
       </div>
       <div className="border-t px-3 py-3">

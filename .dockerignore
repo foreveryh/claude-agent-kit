@@ -1,0 +1,14 @@
+.git
+.gitignore
+.DS_Store
+node_modules
+**/node_modules
+dist
+**/dist
+tmp
+*.log
+pnpm-debug.log
+coverage
+examples/**/dist
+examples/**/node_modules
+packages/**/dist

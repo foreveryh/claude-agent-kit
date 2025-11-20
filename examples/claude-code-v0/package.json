@@ -23,7 +23,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.13",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.47",
     "@codesandbox/sandpack-react": "^2.20.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.12",

@@ -34,7 +34,7 @@
     "node": ">=18"
   },
   "peerDependencies": {
-    "@anthropic-ai/claude-agent-sdk": ">=0.1.0"
+    "@anthropic-ai/claude-agent-sdk": ">=0.1.47"
   },
   "dependencies": {
     "nanoid": "^5.0.7"

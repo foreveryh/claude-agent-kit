@@ -8,6 +8,7 @@ import { WebSocketServer } from 'ws'
 import { SimpleClaudeAgentSDKClient } from '@claude-agent-kit/server'
 import { WebSocketHandler } from '@claude-agent-kit/websocket'
 import { registerApiRoutes } from './api'
+import { registerSkillUploadRoute } from './api/skills'
 import { registerRoutes } from './routes'
 
 export interface CreateServerOptions {
@@ -18,13 +19,20 @@ export async function createServer(options: CreateServerOptions = {}) {
   const root = options.root ?? process.cwd()
   const isProduction = process.env.NODE_ENV === 'production'
   const base = process.env.BASE ?? '/'
+  const workspaceDir = process.env.WORKSPACE_DIR ?? path.resolve(root, 'agent')
+  await fs.mkdir(workspaceDir, { recursive: true })
 
   const app = express()
   const httpServer = createHttpServer(app)
   const webSocketServer = new WebSocketServer({ server: httpServer })
-  const sdkClient = new SimpleClaudeAgentSDKClient()
+  const sdkClient = new SimpleClaudeAgentSDKClient({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    baseURL: process.env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_API_URL,
+    model: process.env.ANTHROPIC_MODEL,
+  })
   const webSocketHandler = new WebSocketHandler(sdkClient, {
     thinkingLevel: 'default_on',
+    cwd: workspaceDir,
   })
 
   webSocketServer.on('connection', (ws) => {
@@ -65,7 +73,13 @@ export async function createServer(options: CreateServerOptions = {}) {
     app.use(base, sirv(path.resolve(root, 'dist/client'), { extensions: [] }))
   }
 
-  registerApiRoutes(app)
+  registerApiRoutes(app, {
+    sdkClient,
+    defaultSessionOptions: webSocketHandler.options,
+    workspaceDir,
+  })
+
+  registerSkillUploadRoute(app, { workspaceDir })
 
   registerRoutes(app, {
     base,

@@ -20,9 +20,15 @@ export type SessionSelectPayload = {
   projectId: string
 }
 
+import type { CapabilitySnapshot } from '@/types/capabilities'
+
 export type LeftSidebarProps = {
   selectedSessionId?: string | null
   onSessionSelect?: (payload: SessionSelectPayload) => void
   onProjectChange?: (projectId: string | null) => void
-  onNewSession?: () => void
+  onNewSession?: (projectId: string) => void
+  capabilities?: CapabilitySnapshot | null
+  isLoadingCapabilities?: boolean
+  capabilitiesError?: string | null
+  onRefreshCapabilities?: () => void | Promise<void>
 }

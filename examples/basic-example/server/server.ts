@@ -5,12 +5,20 @@ import { BunWebSocketHandler, type WSClient } from "@claude-agent-kit/bun-websoc
 import {
   SimpleClaudeAgentSDKClient,
   type SessionSDKOptions,
+  type SimpleClientConfig,
 } from "@claude-agent-kit/server";
 import {
   handlePingEndpoint
 } from "./endpoints";
 
-const sdkClient = new SimpleClaudeAgentSDKClient();
+// Configure custom API endpoint
+const clientConfig: SimpleClientConfig = {
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  baseURL: process.env.ANTHROPIC_BASE_URL,
+  model: process.env.ANTHROPIC_MODEL,
+};
+
+const sdkClient = new SimpleClaudeAgentSDKClient(clientConfig);
 
 const defaultOptions: SessionSDKOptions = {
   cwd: path.join(process.cwd(), "agent"),

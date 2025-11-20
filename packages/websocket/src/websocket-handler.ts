@@ -35,6 +35,11 @@ export class WebSocketHandler {
     this.clients.set(ws, client);
     console.log('WebSocket client connected:', client.sessionId);
     this.sessionManager.subscribe(client);
+    try {
+      this.sessionManager.setSDKOptions(client, this.options);
+    } catch (error) {
+      console.error("Failed to apply default SDK options:", error);
+    }
 
     this.send(ws, { type: "connected", message: 'Connected to the Claude Code WebSocket server.' });
   }
@@ -113,6 +118,17 @@ export class WebSocketHandler {
         code: "empty_message",
       });
       return;
+    }
+
+    const requestedSessionId = typeof message.sessionId === "string" ? message.sessionId.trim() : null;
+
+    if (!requestedSessionId) {
+      const previousSessionId = client.sessionId;
+      if (previousSessionId) {
+        const previousSession = this.sessionManager.getSession(previousSessionId);
+        previousSession?.unsubscribe(client);
+      }
+      client.sessionId = undefined;
     }
 
     this.sessionManager.sendMessage(client, content, message.attachments);

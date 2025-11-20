@@ -1,5 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { HookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { HookJSONOutput, SettingSource } from "@anthropic-ai/claude-agent-sdk";
 import * as path from "path";
 import { AGENT_PROMPT } from "./agent-prompt";
 import type { SDKMessage, SDKUserMessage } from "./types";
@@ -22,6 +22,7 @@ export interface AIQueryOptions {
   mcpServers?: any;
   hooks?: any;
   resume?: string;
+  settingSources?: SettingSource[];
 }
 
 export class AIClient {
@@ -91,6 +92,7 @@ export class AIClient {
           }
         ]
       },
+      settingSources: ["user", "project", "local"],
       ...options
     };
   }
