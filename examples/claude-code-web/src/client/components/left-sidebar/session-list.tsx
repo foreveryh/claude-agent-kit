@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -10,6 +10,7 @@ type SessionListProps = {
   sessions: SessionSummary[]
   selectedSessionId: string | null
   onSelect: (sessionId: string) => void
+  onDelete?: (sessionId: string) => void
   isLoading: boolean
   errorMessage: string | null
 }
@@ -18,14 +19,15 @@ export function SessionList({
   sessions,
   selectedSessionId,
   onSelect,
+  onDelete,
   isLoading,
   errorMessage,
 }: SessionListProps) {
-  const selectedButtonRef = useRef<HTMLButtonElement | null>(null)
+  const selectedEntryRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (selectedButtonRef.current) {
-      selectedButtonRef.current.scrollIntoView({
+    if (selectedEntryRef.current) {
+      selectedEntryRef.current.scrollIntoView({
         block: 'center',
         behavior: 'smooth',
       })
@@ -57,11 +59,18 @@ export function SessionList({
       {sessions.map((session) => {
         const isSelected = session.id === selectedSessionId
         return (
-          <button
+          <div
             key={session.id}
-            type="button"
-            ref={isSelected ? selectedButtonRef : null}
+            role="button"
+            tabIndex={0}
+            ref={isSelected ? selectedEntryRef : null}
             onClick={() => onSelect(session.id)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onSelect(session.id)
+              }
+            }}
             className={cn(
               'w-full rounded-md px-2 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isSelected ? 'bg-muted' : 'bg-transparent',
@@ -77,8 +86,21 @@ export function SessionList({
                   {formatRelativeTime(session.lastMessageAt)}
                 </p>
               </div>
+              {onDelete ? (
+                <button
+                  type="button"
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                  title="Delete session"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onDelete(session.id)
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
-          </button>
+          </div>
         )
       })}
     </div>

@@ -19,6 +19,7 @@ import { CapabilitiesPanel } from './capabilities-panel'
 const PROJECTS_ENDPOINT = '/api/projects'
 
 export function LeftSidebar({
+  selectedSessionId,
   onSessionSelect,
   onProjectChange,
   onNewSession,
@@ -42,6 +43,40 @@ export function LeftSidebar({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
   const [isNewSessionPending, setIsNewSessionPending] = useState(false)
+
+  const applySessionsUpdate = useCallback(
+    (targetProjectId: string, sessions: SessionSummary[]) => {
+      setProjectSessions((prev) => ({
+        ...prev,
+        [targetProjectId]: sessions,
+      }))
+
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === targetProjectId
+            ? { ...project, latestActivity: computeLatestActivity(sessions) }
+            : project,
+        ),
+      )
+    },
+    [setProjectSessions, setProjects],
+  )
+
+  const refreshSessionsForProject = useCallback(
+    async (targetProjectId: string) => {
+      try {
+        const sessions = await fetchProjectSessions(targetProjectId)
+        applySessionsUpdate(targetProjectId, sessions)
+        setErrorMessage(null)
+      } catch (error) {
+        console.error('Failed to refresh sessions:', error)
+        setErrorMessage(
+          error instanceof Error ? error.message : 'Failed to load sessions.',
+        )
+      }
+    },
+    [applySessionsUpdate],
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -245,21 +280,7 @@ export function LeftSidebar({
           return
         }
 
-        setProjectSessions((prev) => ({
-          ...prev,
-          [targetProjectId]: sessions,
-        }))
-
-        setProjects((prev) =>
-          prev.map((project) =>
-            project.id === targetProjectId
-              ? {
-                  ...project,
-                  latestActivity: computeLatestActivity(sessions),
-                }
-              : project,
-          ),
-        )
+        applySessionsUpdate(targetProjectId, sessions)
       } catch (error) {
         if (isAbortError(error)) {
           return
@@ -286,7 +307,7 @@ export function LeftSidebar({
       isMounted = false
       controller.abort()
     }
-  }, [projectSessions, selectedProjectId])
+  }, [projectSessions, selectedProjectId, applySessionsUpdate])
 
   const currentProject = selectedProjectId
     ? projects.find((project) => project.id === selectedProjectId) ?? null
@@ -387,6 +408,74 @@ export function LeftSidebar({
     [onSessionSelect, selectedProjectId],
   )
 
+  const handleDeleteSession = useCallback(
+    async (sessionId: string) => {
+      if (!selectedProjectId) {
+        return
+      }
+
+      const confirmed = window.confirm(
+        'Delete this session permanently? This cannot be undone.',
+      )
+      if (!confirmed) {
+        return
+      }
+
+      try {
+        const response = await fetch(
+          `${PROJECTS_ENDPOINT}/${encodeURIComponent(
+            selectedProjectId,
+          )}/sessions/${encodeURIComponent(sessionId)}`,
+          {
+            method: 'DELETE',
+          },
+        )
+
+        if (!response.ok && response.status !== 404) {
+          throw new Error(
+            `Failed to delete session (status ${response.status})`,
+          )
+        }
+
+        await refreshSessionsForProject(selectedProjectId)
+      } catch (error) {
+        console.error('Failed to delete session:', error)
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Failed to delete session.',
+        )
+      }
+    },
+    [selectedProjectId, refreshSessionsForProject],
+  )
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      return
+    }
+    if (!selectedSessionId) {
+      return
+    }
+
+    const sessions = projectSessions[selectedProjectId]
+    if (!sessions || sessions.length === 0) {
+      return
+    }
+
+    const exists = sessions.some((session) => session.id === selectedSessionId)
+    if (exists) {
+      return
+    }
+
+    void refreshSessionsForProject(selectedProjectId)
+  }, [
+    selectedProjectId,
+    selectedSessionId,
+    projectSessions,
+    refreshSessionsForProject,
+  ])
+
   const effectiveSessionId = derivedSessionId
 
   return (
@@ -404,6 +493,7 @@ export function LeftSidebar({
               sessions={currentSessions}
               selectedSessionId={effectiveSessionId}
               onSelect={handleSessionClick}
+              onDelete={handleDeleteSession}
               isLoading={isLoadingSessions}
               errorMessage={errorMessage}
             />
