@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useRoute } from '@/hooks/use-route'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { buildProjectPath, buildSessionPath, navigateTo } from '@/lib/route'
 
 import {
@@ -23,10 +22,12 @@ export function LeftSidebar({
   onSessionSelect,
   onProjectChange,
   onNewSession,
+  onCreateProject,
   capabilities,
   isLoadingCapabilities,
   capabilitiesError,
   onRefreshCapabilities,
+  onDeleteProject,
 }: LeftSidebarProps) {
   const { projectId: routeProjectId, sessionId: routeSessionId } = useRoute()
 
@@ -85,7 +86,6 @@ export function LeftSidebar({
 
     async function loadProjectsAndSessions() {
       setIsLoadingProjects(true)
-      setIsLoadingSessions(true)
       setErrorMessage(null)
 
       try {
@@ -119,62 +119,15 @@ export function LeftSidebar({
           return
         }
 
-        const projectPayloads = await Promise.all(
-          fetchedProjects.map(async (project) => {
-            try {
-              const sessions = await fetchProjectSessions(
-                project.id,
-                controller.signal,
-              )
-              return {
-                project,
-                sessions,
-                latestActivity: computeLatestActivity(sessions),
-              }
-            } catch (error) {
-              if (isAbortError(error)) {
-                throw error
-              }
-
-              console.error(
-                `Failed to load sessions for project '${project.id}':`,
-                error,
-              )
-              return {
-                project,
-                sessions: [] as SessionSummary[],
-                latestActivity: null,
-              }
-            }
-          }),
-        )
-
-        projectPayloads.sort(
-          (a, b) =>
-            (b.latestActivity ?? Number.NEGATIVE_INFINITY) -
-            (a.latestActivity ?? Number.NEGATIVE_INFINITY),
-        )
-
-        if (!isMounted) {
-          return
-        }
-
-        const nextProjects: ProjectWithActivity[] = projectPayloads.map(
-          ({ project, latestActivity }) => ({
+        // Initialize projects without activity first
+        const nextProjects: ProjectWithActivity[] = fetchedProjects.map(
+          (project) => ({
             ...project,
-            latestActivity,
+            latestActivity: null,
           }),
         )
-
-        const nextSessions = projectPayloads.reduce<
-          Record<string, SessionSummary[]>
-        >((acc, payload) => {
-          acc[payload.project.id] = payload.sessions
-          return acc
-        }, {})
 
         setProjects(nextProjects)
-        setProjectSessions(nextSessions)
         setHasLoadedInitialData(true)
       } catch (error) {
         if (isAbortError(error)) {
@@ -195,7 +148,6 @@ export function LeftSidebar({
         if (!controller.signal.aborted) {
           if (isMounted) {
             setIsLoadingProjects(false)
-            setIsLoadingSessions(false)
           }
         }
       }
@@ -260,13 +212,17 @@ export function LeftSidebar({
     }
   }, [hasLoadedInitialData, projects, routeProjectId, selectedProjectId])
 
+  const currentProject = selectedProjectId
+    ? projects.find((project) => project.id === selectedProjectId) ?? null
+    : null
+
   useEffect(() => {
     if (!hasLoadedInitialData) {
       return
     }
 
-    onProjectChange?.(selectedProjectId)
-  }, [selectedProjectId, onProjectChange, hasLoadedInitialData])
+    onProjectChange?.(currentProject)
+  }, [currentProject, onProjectChange, hasLoadedInitialData])
 
   useEffect(() => {
     const projectId = selectedProjectId
@@ -324,9 +280,7 @@ export function LeftSidebar({
     }
   }, [projectSessions, selectedProjectId, applySessionsUpdate])
 
-  const currentProject = selectedProjectId
-    ? projects.find((project) => project.id === selectedProjectId) ?? null
-    : null
+
 
   const currentSessions = selectedProjectId
     ? projectSessions[selectedProjectId] ?? []
@@ -499,7 +453,7 @@ export function LeftSidebar({
         latestActivity={currentProject ? currentProject.latestActivity : null}
       />
       <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
+        <div className="h-full w-full overflow-y-auto">
           <div className="flex h-full flex-col gap-3 px-2 py-3">
             <SessionList
               sessions={currentSessions}
@@ -509,18 +463,18 @@ export function LeftSidebar({
               isLoading={isLoadingSessions}
               errorMessage={errorMessage}
             />
-            <div className="mt-auto">
-              <CapabilitiesPanel
-                capabilities={capabilities}
-                isLoading={isLoadingCapabilities}
-                errorMessage={capabilitiesError}
-                onRefresh={onRefreshCapabilities}
-              />
-            </div>
           </div>
-        </ScrollArea>
+        </div>
       </div>
-      <div className="border-t px-3 py-3">
+      <div className="border-t border-border p-3">
+        <CapabilitiesPanel
+          capabilities={capabilities}
+          isLoading={isLoadingCapabilities}
+          errorMessage={capabilitiesError}
+          onRefresh={onRefreshCapabilities}
+        />
+      </div>
+      <div className="border-t border-border px-3 py-3">
         <ProjectPicker
           projects={projects}
           selectedProjectId={selectedProjectId}
@@ -528,6 +482,8 @@ export function LeftSidebar({
           isOpen={isProjectPickerOpen}
           onOpenChange={setIsProjectPickerOpen}
           onSelect={handleProjectSelect}
+          onCreateProject={onCreateProject}
+          onDeleteProject={onDeleteProject}
         />
       </div>
     </div>

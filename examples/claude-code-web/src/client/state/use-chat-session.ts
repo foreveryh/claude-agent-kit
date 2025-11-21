@@ -22,9 +22,10 @@ import {
 export function useChatSessionState() {
   const messages = useAtomValue(chatMessagesAtom)
   const sessionId = useAtomValue(chatSessionIdAtom)
+  const projectId = useAtomValue(chatProjectIdAtom)
   const sessionInfo = useAtomValue(chatSessionInfoAtom)
 
-  return { messages, sessionId, sessionInfo }
+  return { messages, sessionId, projectId, sessionInfo }
 }
 
 export function useOutcomingMessageHandler() {

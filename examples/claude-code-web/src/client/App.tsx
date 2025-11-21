@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAtomValue, useSetAtom } from 'jotai'
+import { useSetAtom } from 'jotai'
 
 import { ChatHeader } from '@/components/chat/chat-header'
 import {
@@ -10,7 +10,7 @@ import {
 import type { FileSuggestion } from '@/components/prompt-input/mention-file-list'
 import { MessagesPane } from '@/components/chat/messages-pane'
 import { LeftSidebar } from '@/components/left-sidebar/left-sidebar'
-import type { SessionSelectPayload } from '@/components/left-sidebar/types'
+import type { SessionSelectPayload, Project } from '@/components/left-sidebar/types'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -123,10 +123,10 @@ function isOutcomingServerMessage(
 }
 
 function App() {
-  const { messages, sessionId, sessionInfo } = useChatSessionState()
+  const { messages, sessionId, projectId: currentProjectId, sessionInfo } = useChatSessionState()
+
   const setMessages = useSetAtom(chatMessagesAtom)
   const setSessionInfo = useSetAtom(chatSessionInfoAtom)
-  const currentProjectId = useAtomValue(chatProjectIdAtom)
   const { isBusy, isLoading, options } = sessionInfo
   const permissionMode = options.permissionMode ?? 'default'
   const thinkingLevel = options.thinkingLevel ?? 'off'
@@ -203,7 +203,7 @@ function App() {
               description: 'Slash command',
             },
             section: 'Slash Commands',
-            handler: () => {},
+            handler: () => { },
           })
           changed = true
         }
@@ -287,7 +287,7 @@ function App() {
     setModelSelection(model.value)
   }, [])
 
-  const handleToggleIncludeSelection = useCallback(() => {}, [])
+  const handleToggleIncludeSelection = useCallback(() => { }, [])
 
   const handleSkillUploadClick = useCallback(() => {
     skillFileInputRef.current?.click()
@@ -467,6 +467,82 @@ function App() {
     onMessage: handleServerMessage,
   })
 
+  const handleCreateNewProject = useCallback(
+    async (name: string) => {
+      try {
+        // Create directory (server constructs the full path)
+        const createRes = await fetch('/api/create-directory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        })
+        const createResult = await createRes.json()
+
+        if (!createResult.success) {
+          throw new Error(createResult.error || 'Failed to create directory')
+        }
+
+        const fullPath = createResult.path
+
+        // Switch to new project
+        setSDKOptions({ cwd: fullPath })
+        selectChatSession({ sessionId: null, projectId: null })
+        setMessages([
+          createSystemMessage(`✅ Created independent workspace: ${name}\n📍 Location: ${fullPath}\n🔄 Claude has switched to this workspace\n\nThis project has its own:\n• Session history (.claude/)\n• Skills and tools\n• Permissions\n\nStart a new conversation to save it.`),
+        ])
+      } catch (error) {
+        setMessages((previous) => [
+          ...previous,
+          createSystemMessage(`Error creating project: ${error instanceof Error ? error.message : 'Unknown error'}`),
+        ])
+      }
+    },
+    [setSDKOptions, selectChatSession, setMessages],
+  )
+
+  const handleDeleteProject = useCallback(
+    async (projectId: string, projectName: string) => {
+      try {
+        const deleteRes = await fetch(`/api/projects/${encodeURIComponent(projectName)}`, {
+          method: 'DELETE',
+        })
+        const deleteResult = await deleteRes.json()
+
+        if (!deleteResult.success) {
+          throw new Error(deleteResult.error || 'Failed to delete project')
+        }
+
+        setMessages((previous) => [
+          ...previous,
+          createSystemMessage(`Project "${projectName}" has been deleted.`),
+        ])
+
+        // If we deleted the current project, clear the session
+        if (projectId === currentProjectId) {
+          selectChatSession({ sessionId: null, projectId: null })
+        }
+
+        // Refresh project list
+        window.location.reload()
+      } catch (error) {
+        setMessages((previous) => [
+          ...previous,
+          createSystemMessage(`Error deleting project: ${error instanceof Error ? error.message : 'Unknown error'}`),
+        ])
+      }
+    },
+    [currentProjectId, selectChatSession, setMessages],
+  )
+
+  const handleProjectChange = useCallback(
+    (project: Project | null) => {
+      if (project) {
+        setSDKOptions({ cwd: project.path })
+      }
+    },
+    [setSDKOptions],
+  )
+
   const { setPermissionMode, setThinkingLevel } = useChatSessionOptions(
     setSDKOptions,
   )
@@ -536,7 +612,10 @@ function App() {
             <LeftSidebar
               selectedSessionId={sessionId}
               onSessionSelect={handleSessionSelect}
+              onProjectChange={handleProjectChange}
               onNewSession={handleNewSession}
+              onCreateProject={handleCreateNewProject}
+              onDeleteProject={handleDeleteProject}
               capabilities={capabilities}
               isLoadingCapabilities={isLoadingCapabilities}
               capabilitiesError={capabilitiesError}
