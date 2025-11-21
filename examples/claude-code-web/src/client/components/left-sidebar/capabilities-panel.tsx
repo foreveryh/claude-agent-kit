@@ -94,14 +94,14 @@ export function CapabilitiesPanel({
             ))}
           </CapabilitySection>
 
-          <CapabilitySection title={`Skills (${skills.length || slashCommands.length})`}>
-            {skills.length > 0
-              ? skills.map((skill) => (
-                  <CapabilityBadge key={skill} label={skill} variant="ghost" />
-                ))
-              : slashCommands.map((command) => (
-                  <CapabilityBadge key={`skill-${command}`} label={command} variant="ghost" />
-                ))}
+          <CapabilitySection title={`Skills (${skills.length})`}>
+            {skills.length > 0 ? (
+              skills.map((skill) => (
+                <CapabilityBadge key={skill} label={skill} variant="ghost" />
+              ))
+            ) : (
+              <p className="text-slate-400">Nothing available.</p>
+            )}
           </CapabilitySection>
         </div>
       ) : (
