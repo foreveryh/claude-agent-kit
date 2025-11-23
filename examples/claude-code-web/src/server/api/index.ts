@@ -17,7 +17,8 @@ import { collectCapabilitySummary } from './capabilities'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  // Allow auth headers so browsers can send API keys / bearer tokens
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
 }
 
 const API_AUTH_TOKEN = process.env.API_AUTH_TOKEN?.trim() || null

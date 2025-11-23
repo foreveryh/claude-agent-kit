@@ -26,6 +26,8 @@ export async function createServer(options: CreateServerOptions = {}) {
   process.env.WORKSPACE_DIR = workspaceDir
 
   const app = express()
+  // Trust the first reverse proxy (e.g., Nginx/ingress) so rate limiting uses the real client IP
+  app.set('trust proxy', 1)
   const httpServer = createHttpServer(app)
   const webSocketServer = new WebSocketServer({ server: httpServer })
   const sdkClient = new SimpleClaudeAgentSDKClient({
