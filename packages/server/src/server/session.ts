@@ -36,9 +36,9 @@ const DEFAULT_ALLOWED_TOOLS: readonly string[] = [
   "NotebookEdit",
   "WebFetch",
   "TodoWrite",
-  "WebSearch",
   "BashOutput",
   "KillBash",
+  "Skill",
 ];
 
 const DEFAULT_SESSION_OPTIONS: SessionSDKOptions = {
@@ -93,6 +93,9 @@ export class Session {
   private messageList: SDKMessage[] = [];
   private isLoaded = false;
   private clients: Set<ISessionClient> = new Set();
+  private pendingStateUpdate: SessionStateUpdate | null = null;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly DEBOUNCE_MS = 50;
 
   constructor(sdkClient: IClaudeAgentSDKClient) {
     this.sdkClient = sdkClient;
@@ -438,8 +441,26 @@ export class Session {
     if (!update || Object.keys(update).length === 0) {
       return;
     }
-    // TODO: debounce
-    this.notifyClients("sessionStateChanged", this.createSessionStateMessage(update));
+
+    // Accumulate updates
+    this.pendingStateUpdate = {
+      ...this.pendingStateUpdate,
+      ...update,
+    };
+
+    // Clear existing timer
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+
+    // Set new timer to batch updates
+    this.debounceTimer = setTimeout(() => {
+      if (this.pendingStateUpdate) {
+        this.notifyClients("sessionStateChanged", this.createSessionStateMessage(this.pendingStateUpdate));
+        this.pendingStateUpdate = null;
+      }
+      this.debounceTimer = null;
+    }, this.DEBOUNCE_MS);
   }
 }
 

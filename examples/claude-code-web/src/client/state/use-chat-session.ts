@@ -35,10 +35,23 @@ export function useOutcomingMessageHandler() {
 
   return useCallback(
     (payload: OutcomingMessage) => {
-      console.log('[useOutcomingMessageHandler]', payload.type, {
-        sessionId: payload.sessionId,
-        messageCount: payload.type === 'messages_updated' ? payload.messages?.length : undefined,
-      })
+      // More informative logging
+      if (payload.type === 'session_state_changed') {
+        const stateInfo: Record<string, unknown> = { sessionId: payload.sessionId }
+        if (payload.sessionState.isBusy !== undefined) stateInfo.isBusy = payload.sessionState.isBusy
+        if (payload.sessionState.isLoading !== undefined) stateInfo.isLoading = payload.sessionState.isLoading
+        if (payload.sessionState.options) stateInfo.optionsUpdated = true
+        console.log('[useOutcomingMessageHandler] session_state_changed', stateInfo)
+      } else if (payload.type === 'messages_updated') {
+        console.log('[useOutcomingMessageHandler] messages_updated', {
+          sessionId: payload.sessionId,
+          messageCount: payload.messages?.length,
+        })
+      } else {
+        console.log('[useOutcomingMessageHandler]', payload.type, {
+          sessionId: payload.sessionId,
+        })
+      }
 
       setSessionId(payload.sessionId ?? null)
 
@@ -53,7 +66,7 @@ export function useOutcomingMessageHandler() {
 
       if (payload.type === 'messages_updated') {
         const updated = sortMessages(convertSDKMessages(payload.messages))
-        console.log('[useOutcomingMessageHandler] messages_updated, new count:', updated.length)
+        console.log('[useOutcomingMessageHandler] messages_updated applied, new count:', updated.length)
         setMessages(updated)
         return
       }

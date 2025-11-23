@@ -15,6 +15,7 @@ import { WebFetchRenderer } from './renderers/webfetch-tool-renderer';
 import { PlanExitRenderer } from './renderers/plan-exit-renderer';
 import { SlashCommandRenderer } from './renderers/slash-command-renderer';
 import { DefaultToolRenderer } from './renderers/default-tool-renderer';
+import { SkillToolRenderer } from './renderers/skill-tool-renderer';
 
 export function getToolRenderer(name: string, context: ClaudeMessageContext): BaseToolRenderer {
   switch (name) {
@@ -48,6 +49,8 @@ export function getToolRenderer(name: string, context: ClaudeMessageContext): Ba
       return new NotebookEditRenderer(context);
     case 'SlashCommand':
       return new SlashCommandRenderer();
+    case 'Skill':
+      return new SkillToolRenderer();
     default:
       return new DefaultToolRenderer(name);
   }

@@ -44,6 +44,14 @@ export async function createServer(options: CreateServerOptions = {}) {
   const baseOptions = {
     thinkingLevel: 'default_on',
     cwd: workspaceDir,
+    permissionMode: 'bypassPermissions',
+    get systemPrompt() {
+      return {
+        type: 'preset',
+        preset: 'claude_code',
+        append: `\nToday's date is ${new Date().toDateString()}`,
+      }
+    },
   } as SessionSDKOptions
 
   if (Object.keys(mcpConfig.mcpServers).length > 0) {

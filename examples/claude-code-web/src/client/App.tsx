@@ -293,43 +293,7 @@ function App() {
     skillFileInputRef.current?.click()
   }, [])
 
-  const handleSkillFileSelected = useCallback(
-    async (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0]
-      if (!file) {
-        return
-      }
-      setIsUploadingSkill(true)
-      setSkillUploadMessage('Uploading skill…')
-      try {
-        const formData = new FormData()
-        formData.append('file', file)
-        const normalizedName = file.name.replace(/\.zip$/i, '')
-        if (normalizedName) {
-          formData.append('name', normalizedName)
-        }
 
-        const response = await fetch('/api/skills/upload', {
-          method: 'POST',
-          body: formData,
-        })
-        const payload = await response.json().catch(() => ({}))
-        if (!response.ok) {
-          const message = (payload as { error?: string })?.error ?? 'Failed to upload skill'
-          throw new Error(message)
-        }
-        setSkillUploadMessage('Skill uploaded successfully. Ready for next run.')
-        void refreshCapabilities()
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to upload skill'
-        setSkillUploadMessage(message)
-      } finally {
-        setIsUploadingSkill(false)
-        event.target.value = ''
-      }
-    },
-    [refreshCapabilities],
-  )
 
   const handleAddFiles = useCallback((files: FileList) => {
     setAttachedFiles((previous) => [
@@ -466,6 +430,46 @@ function App() {
     url: websocketUrl,
     onMessage: handleServerMessage,
   })
+
+  const handleSkillFileSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (!file) {
+        return
+      }
+      setIsUploadingSkill(true)
+      setSkillUploadMessage('Uploading skill…')
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const normalizedName = file.name.replace(/\.zip$/i, '')
+        if (normalizedName) {
+          formData.append('name', normalizedName)
+        }
+
+        const response = await fetch('/api/skills/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          const message = (payload as { error?: string })?.error ?? 'Failed to upload skill'
+          throw new Error(message)
+        }
+        setSkillUploadMessage('Skill uploaded successfully. Ready for next run.')
+        void refreshCapabilities()
+        // Force session refresh to pick up new skills
+        setSDKOptions(sessionInfo.options)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to upload skill'
+        setSkillUploadMessage(message)
+      } finally {
+        setIsUploadingSkill(false)
+        event.target.value = ''
+      }
+    },
+    [refreshCapabilities, setSDKOptions, sessionInfo.options],
+  )
 
   const handleCreateNewProject = useCallback(
     async (name: string) => {

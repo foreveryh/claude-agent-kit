@@ -141,4 +141,9 @@ vite.config.ts.timestamp-*
 # Claude Agent Runtime Directories
 # These contain workspace-specific runtime files and caches
 examples/claude-code-web/agent/
+!examples/claude-code-web/agent/.claude/
+!examples/claude-code-web/agent/.claude/skills/
 examples/claude-code-web/Agent*/
+
+# macOS system files
+.DS_Store
