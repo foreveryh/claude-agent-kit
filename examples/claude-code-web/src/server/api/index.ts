@@ -144,7 +144,9 @@ export function registerApiRoutes(
 
       res.json({ capabilities })
     } catch (error) {
-      res.status(500).json({
+      // Surface details to logs to aid containerized deployments
+      console.error('Capability inspection failed:', error)
+      res.status(503).json({
         error: 'Failed to inspect Claude Agent SDK capabilities',
         details: formatErrorMessage(error),
       })
