@@ -46,7 +46,8 @@ export async function createServer(options: CreateServerOptions = {}) {
   const baseOptions = {
     thinkingLevel: 'default_on',
     cwd: workspaceDir,
-    permissionMode: 'bypassPermissions',
+    // Avoid --dangerously-skip-permissions under root; default to plan mode
+    permissionMode: 'plan',
     get systemPrompt() {
       return {
         type: 'preset',
