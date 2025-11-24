@@ -40,6 +40,24 @@ export function registerApiRoutes(
   const { sdkClient, defaultSessionOptions, workspaceDir } = options
   const hasAnthropicApiKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
 
+  function buildFallbackCapabilities(message: string) {
+    return {
+      capabilities: {
+        tools: [],
+        mcpServers: [],
+        slashCommands: [],
+        skills: [],
+        plugins: [],
+        model: defaultSessionOptions?.model || 'unknown',
+        cwd: defaultSessionOptions?.cwd ?? workspaceDir ?? null,
+        permissionMode: defaultSessionOptions?.permissionMode || 'plan',
+        apiKeySource: hasAnthropicApiKey ? 'env' : 'missing',
+        localSkills: [],
+      },
+      warning: message,
+    }
+  }
+
   app.use(
     '/api',
     (req, res, next) => {
@@ -128,10 +146,11 @@ export function registerApiRoutes(
 
   app.get('/api/capabilities', async (_req, res) => {
     if (!sdkClient || !hasAnthropicApiKey) {
-      res.status(503).json({
-        error: 'Capability inspection is not available',
-        details: 'Set ANTHROPIC_API_KEY in the server environment to enable capability probing.',
-      })
+      res.json(
+        buildFallbackCapabilities(
+          'Capability inspection is disabled (missing Anthropic-compatible API key).',
+        ),
+      )
       return
     }
 
@@ -146,10 +165,11 @@ export function registerApiRoutes(
     } catch (error) {
       // Surface details to logs to aid containerized deployments
       console.error('Capability inspection failed:', error)
-      res.status(503).json({
-        error: 'Failed to inspect Claude Agent SDK capabilities',
-        details: formatErrorMessage(error),
-      })
+      res.json(
+        buildFallbackCapabilities(
+          `Capability inspection failed: ${formatErrorMessage(error)}`,
+        ),
+      )
     }
   })
 
