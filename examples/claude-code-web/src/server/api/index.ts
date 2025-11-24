@@ -17,11 +17,8 @@ import { collectCapabilitySummary } from './capabilities'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  // Allow auth headers so browsers can send API keys / bearer tokens
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
+  'Access-Control-Allow-Headers': 'Content-Type',
 }
-
-const API_AUTH_TOKEN = process.env.API_AUTH_TOKEN?.trim() || null
 
 const rateLimiter = rateLimit({
   windowMs: Number(process.env.API_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000), // default 15m
@@ -29,29 +26,6 @@ const rateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 })
-
-function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!API_AUTH_TOKEN) {
-    next()
-    return
-  }
-
-  const authHeader = req.headers.authorization
-  const apiKeyHeader = req.headers['x-api-key']
-
-  const bearer = authHeader?.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length).trim()
-    : null
-
-  const provided = bearer || (typeof apiKeyHeader === 'string' ? apiKeyHeader.trim() : null)
-
-  if (provided && provided === API_AUTH_TOKEN) {
-    next()
-    return
-  }
-
-  res.status(401).json({ error: 'Unauthorized' })
-}
 
 type RegisterApiRoutesOptions = {
   sdkClient?: IClaudeAgentSDKClient
@@ -79,7 +53,6 @@ export function registerApiRoutes(
       next()
     },
     rateLimiter,
-    requireAuth,
   )
 
   app.get('/api/projects', async (_req, res) => {
